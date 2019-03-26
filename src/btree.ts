@@ -40,10 +40,16 @@ class Node<T> {
 
   public insertNonfull(k: T): void {
     if (this.isLeaf) {
-      const i = this.findKeyLoc(k);
+      let i = 0;
+      for (; i < this.keys.length; i++) {
+        if (k < this.keys[i]) break;
+      }
       this.keys.splice(i, 0, k);
     } else {
-      const i = this.findKeyLoc(k);
+      let i = 0;
+      for (; i < this.keys.length; i++) {
+        if (k < this.keys[i]) break;
+      }
       let c = this.children[i];
       if (c.isFull()) {
         this.splitChild(i);
@@ -53,12 +59,96 @@ class Node<T> {
     }
   }
 
-  private findKeyLoc(k: T): number {
-    let i = 0;
-    for (; i < this.keys.length; i++) {
-      if (k < this.keys[i]) break;
+  public delete(k: T): void {
+    const t = this.t;
+    if (this.isLeaf) {
+      // 1
+      const i = this.keys.indexOf(k);
+      if (i >= 0) this.keys.splice(i, 1);
+      return;
     }
-    return i;
+
+    if (this.keys.includes(k)) {
+      // 2
+      const i = this.keys.indexOf(k);
+      const y = this.children[i];
+      const z = this.children[i + 1];
+      if (y.keys.length >= t) {
+        // 2a
+        const k2 = y.keys[y.pred(k)];
+        y.delete(k2);
+        this.keys[i] = k2;
+        return;
+      } else if (z.keys.length >= t) {
+        // 2b
+        const k2 = z.keys[z.succ(k)];
+        z.delete(k2);
+        this.keys[i] = k2;
+        return;
+      } else {
+        // 2c
+        this.keys.splice(i, 1);
+        y.keys.push(k);
+        y.keys = y.keys.concat(z.keys);
+        this.children.splice(i + 1, 1);
+        y.delete(k);
+        return;
+      }
+    } else {
+      const i = this.succ(k);
+      const c = this.children[i];
+      if (c.keys.length >= t) {
+        c.delete(k);
+        return;
+      } else {
+        const left = i > 0 ? this.children[i - 1] : null;
+        const right = i < this.keys.length ? this.children[i + 1] : null;
+        if (left && left.t >= t) {
+          // 3a left
+          const k2 = this.keys[i];
+          c.keys.unshift(k2);
+          this.keys[i] = left.keys[left.keys.length - 1];
+          left.keys.pop();
+        } else if (right && right.t >= t) {
+          // 3a right
+          const k2 = this.keys[i];
+          c.keys.push(k2);
+          this.keys[i] = right.keys[0];
+          right.keys.shift();
+        } else {
+          // 3b
+          if (left) {
+            this.keys.splice(i, 1);
+            left.keys.push(k);
+            c.keys = left.keys.concat(c.keys);
+            this.children.splice(i - 1, 1);
+          } else if (right) {
+            this.keys.splice(i, 1);
+            c.keys.push(k);
+            c.keys = c.keys.concat(right.keys);
+            this.children.splice(i + 1, 1);
+          }
+        }
+        c.delete(k);
+        return;
+      }
+    }
+  }
+
+  private succ(k: T): number {
+    let j = 0;
+    for (; j < this.keys.length; j++) {
+      if (k < this.keys[j]) break;
+    }
+    return j;
+  }
+
+  private pred(k: T): number {
+    let j = this.keys.length - 1;
+    for (; j >= 0; j--) {
+      if (k > this.keys[j]) break;
+    }
+    return j;
   }
 }
 
@@ -93,6 +183,13 @@ export class BTree<T> {
       return node.keys[i];
     } else {
       return null;
+    }
+  }
+
+  public delete(k: T): void {
+    this.root.delete(k);
+    if (this.root.keys.length == 0) {
+      this.root = this.root.children[0];
     }
   }
 }
